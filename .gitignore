@@ -1,0 +1,9 @@
+.cache/
+.ssh/
+.bash_history
+.bash_logout
+.viminfo
+.lesshst
+sudo_as_admin_successful
+*.bak
+*.bak2
