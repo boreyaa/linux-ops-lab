@@ -78,14 +78,18 @@ def parse_time(raw):
 
 def read_records():
     records = []
+    skipped = 0
     if not os.path.exists(LOG_PATH):
-        return records
+        return records, skipped
     with open(LOG_PATH, encoding="utf-8", errors="replace") as f:
         for line in f:
             m = LINE_RE.match(line)
             if not m:
                 continue
             ip, ts, request, status, size, referer, ua = m.groups()
+            if ip.startswith("127.") or ip in ("::1", "localhost"):
+                skipped += 1
+                continue
             records.append({
                 "ip": ip,
                 "time": parse_time(ts),
@@ -93,10 +97,10 @@ def read_records():
                 "status": status,
                 "ua": ua[:60],
             })
-    return records
+    return records, skipped
 
 
-def render(records, cache):
+def render(records, cache, skipped=0):
     rows = list(reversed(records))[:MAX_ROWS]
 
     by_ip = {}
@@ -128,7 +132,7 @@ def render(records, cache):
     parts.append(".s200{color:#0F6E56;font-weight:600;}")
     parts.append("</style></head><body>")
     parts.append("<h1>访问记录</h1>")
-    parts.append('<p class="meta">生成时间 ' + datetime.now().strftime("%Y-%m-%d %H:%M:%S") + " · 数据来源 nginx access.log</p>")
+    parts.append('<p class="meta">生成时间 ' + datetime.now().strftime("%Y-%m-%d %H:%M:%S") + " · 数据来源 nginx access.log · 已排除本机请求 " + str(skipped) + " 条</p>")
 
     parts.append("<h2>概况</h2><table>")
     parts.append("<tr><th>总请求数</th><th>独立 IP</th><th>显示条数</th></tr>")
@@ -156,17 +160,18 @@ def render(records, cache):
 
 
 def main():
-    records = read_records()
+    records, skipped = read_records()
     if not records:
         print("没有可解析的访问记录")
         return 0
     cache = load_cache()
-    html = render(records, cache)
+    html = render(records, cache, skipped)
     save_cache(cache)
     os.makedirs(os.path.dirname(OUT_PATH), exist_ok=True)
     with open(OUT_PATH, "w", encoding="utf-8") as f:
         f.write(html)
-    print("已生成 " + OUT_PATH + "，" + str(len(records)) + " 条记录，缓存 " + str(len(cache)) + " 个 IP")
+    print("已生成 " + OUT_PATH + "，" + str(len(records)) + " 条外部访问，已排除本机请求 "
+          + str(skipped) + " 条，缓存 " + str(len(cache)) + " 个 IP")
     return 0
 
 
