@@ -1,7 +1,9 @@
+import ipaddress
 import json
 import os
 import re
 import sys
+import time
 from datetime import datetime
 
 import requests
@@ -10,6 +12,7 @@ LOG_PATH = "/var/log/nginx/access.log"
 OUT_PATH = "/var/www/admin/index.html"
 CACHE_PATH = os.path.expanduser("~/asminsight/data/geo_cache.json")
 MAX_ROWS = 500
+QUERY_GAP = 1.2
 
 LINE_RE = re.compile(
     r'^(\S+) - \S+ \[([^\]]+)\] "([^"]*)" (\d{3}) (\S+) "([^"]*)" "([^"]*)"'
@@ -32,26 +35,37 @@ def save_cache(cache):
         json.dump(cache, f, ensure_ascii=False, indent=1)
 
 
+def is_private(ip):
+    try:
+        addr = ipaddress.ip_address(ip)
+        return addr.is_private or addr.is_loopback
+    except Exception:
+        return False
+
+
 def lookup(ip, cache):
     if ip in cache:
         return cache[ip]
-    info = "未知"
+
+    if is_private(ip):
+        cache[ip] = "内网或本机"
+        return cache[ip]
+
     try:
         resp = requests.get(
             "http://ip-api.com/json/" + ip,
             params={"lang": "zh-CN", "fields": "status,country,regionName,city,isp"},
-            timeout=6,
+            timeout=8,
         )
         data = resp.json()
         if data.get("status") == "success":
             parts = [data.get("country"), data.get("regionName"), data.get("city"), data.get("isp")]
             info = " / ".join([p for p in parts if p])
-        else:
-            info = "内网或保留地址"
+            cache[ip] = info
+            return info
+        return "未知"
     except Exception:
-        info = "查询失败"
-    cache[ip] = info
-    return info
+        return "查询失败（下次重试）"
 
 
 def parse_time(raw):
@@ -90,7 +104,12 @@ def render(records, cache):
         by_ip[item["ip"]] = by_ip.get(item["ip"], 0) + 1
 
     regions = {}
+    looked = 0
     for ip in by_ip:
+        if ip not in cache and not is_private(ip):
+            if looked:
+                time.sleep(QUERY_GAP)
+            looked += 1
         region = lookup(ip, cache)
         regions[region] = regions.get(region, 0) + by_ip[ip]
 
@@ -147,7 +166,7 @@ def main():
     os.makedirs(os.path.dirname(OUT_PATH), exist_ok=True)
     with open(OUT_PATH, "w", encoding="utf-8") as f:
         f.write(html)
-    print("已生成 " + OUT_PATH + "，" + str(len(records)) + " 条记录")
+    print("已生成 " + OUT_PATH + "，" + str(len(records)) + " 条记录，缓存 " + str(len(cache)) + " 个 IP")
     return 0
 
 
