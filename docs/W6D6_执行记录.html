@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>W6D6 执行记录 · 完整跑一次</title>
+<style>
+:root{--ink:#2C2C2A;--muted:#5F5E5A;--hint:#888780;--line:#E5E3DC;--bg:#FFF;--head:#F5F4F0;--zebra:#FBFAF8;--blue:#185FA5;--teal:#0F6E56;--amber:#854F0B;--amberbg:#FAEEDA;--coral:#993C1D;}
+*{box-sizing:border-box;}
+body{margin:0;padding:36px 22px 70px;background:var(--bg);color:var(--ink);font-family:-apple-system,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;font-size:14px;line-height:1.8;}
+.wrap{max-width:880px;margin:0 auto;}
+h1{font-size:23px;font-weight:500;margin:0 0 6px;}
+.meta{color:var(--hint);font-size:12.5px;margin:0 0 24px;}
+h2{font-size:15.5px;font-weight:500;margin:32px 0 12px;padding-left:11px;border-left:3px solid var(--coral);}
+table{width:100%;border-collapse:collapse;font-size:13px;margin:0 0 12px;}
+th{background:var(--head);font-weight:500;text-align:left;padding:8px 10px;border-bottom:1px solid var(--line);}
+td{padding:8px 10px;border-bottom:1px solid var(--line);vertical-align:top;}
+tbody tr:nth-child(even){background:var(--zebra);}
+code{background:var(--zebra);border:1px solid var(--line);border-radius:4px;padding:1px 5px;font-size:12px;font-family:Consolas,monospace;word-break:break-all;}
+.ok{color:var(--teal);font-weight:500;}
+.no{color:#A32D2D;font-weight:500;}
+.high{color:#A32D2D;font-weight:500;}
+.medium{color:var(--amber);font-weight:500;}
+.box{border:1px solid var(--line);background:var(--zebra);border-radius:9px;padding:14px 17px;margin:0 0 12px;font-size:13.5px;}
+.box p{margin:0 0 8px;}
+.box p:last-child{margin:0;}
+pre{background:#0d1117;color:#e6edf3;border-radius:7px;padding:11px 14px;font-size:12.5px;line-height:1.8;overflow-x:auto;font-family:Consolas,monospace;margin:0 0 12px;}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<h1>W6D6 执行记录 · 完整跑一次</h1>
+<p class="meta">2026-11-19 · 主机 bore@192.168.88.100 · Ubuntu 22.04 jammy · Python 3.10.12</p>
+
+<h2>一、环境事实</h2>
+<table>
+<tbody>
+<tr><td style="width:22%">项目路径</td><td><code>/home/bore/asminsight</code></td></tr>
+<tr><td>git 分支</td><td><code>w5</code>（非 main）</td></tr>
+<tr><td>解释器</td><td><code>.venv/bin/python</code> → Python 3.10.12</td></tr>
+<tr><td>8080 站点</td><td><code>/etc/nginx/sites-available/site.conf</code>，root <code>/var/www/site</code>，default_server</td></tr>
+<tr><td>未启用站点</td><td><code>app.conf</code> → <code>/var/www/app</code>（含 db.php / info.php，未生效）</td></tr>
+<tr><td>授权配置</td><td><code>allowed_networks: 192.168.88.0/24</code>，<code>targets: [192.168.88.100]</code></td></tr>
+</tbody>
+</table>
+
+<h2>二、跑之前为什么 findings 一直是 0</h2>
+<div class="box">
+<p><code>/var/www/site</code> 下只有一个 17 字节的 <code>index.html</code>，正文为 <code>&lt;h1&gt;site ok&lt;/h1&gt;</code>。</p>
+<p>两个检测器请求的 7 条路径全部返回 404，检测层逻辑本身没有出错。</p>
+<p>表现为 <code>原始 0 条，保留 0 条</code>，报告固定 1801 字节的空壳。</p>
+</div>
+
+<h2>三、检测器原有缺陷（已修）</h2>
+<table>
+<thead><tr><th style="width:20%">文件</th><th style="width:40%">原行为</th><th>后果</th></tr></thead>
+<tbody>
+<tr><td><code>sensitive.py</code></td><td>循环内首个命中即 <code>return</code></td><td>同时存在 <code>.git/config</code>(medium) 与 <code>.env</code>(high) 时只报 medium，高危被中危顶掉</td></tr>
+<tr><td><code>ueditor.py</code></td><td>仅探 <code>/ueditor/controller.php</code></td><td>官方按 php / jsp / net 分目录发布，真实目标大概率漏报</td></tr>
+</tbody>
+</table>
+<p style="font-size:13px;color:var(--muted);margin:0 0 12px;">修法：<code>sensitive.py</code> 收集全部命中并按等级排序返回；<code>ueditor.py</code> 改为 5 条路径轮询；<code>main.py</code> 收集逻辑兼容单条与列表两种返回。原文件备份在 <code>~/asminsight/.bak_20261119/</code>。</p>
+
+<h2>四、命中验证（人造靶，非真实漏洞）</h2>
+<table>
+<thead><tr><th style="width:45%">放置路径（/var/www/site 下）</th><th style="width:20%">命中检测器</th><th>等级</th></tr></thead>
+<tbody>
+<tr><td><code>.git/config</code>（含 <code>[core]</code>）</td><td>sensitive_file</td><td class="medium">medium</td></tr>
+<tr><td><code>.env</code>（含 <code>=</code>）</td><td>sensitive_file</td><td class="high">high</td></tr>
+<tr><td><code>www.zip</code></td><td>sensitive_file</td><td class="high">high</td></tr>
+<tr><td><code>ueditor/controller.php</code></td><td>ueditor_unauth</td><td class="high">high</td></tr>
+<tr><td><code>ueditor/php/controller.php</code></td><td>ueditor_unauth</td><td class="high">high</td></tr>
+</tbody>
+</table>
+
+<h2>五、三件事验收</h2>
+<table>
+<thead><tr><th style="width:24%">检查项</th><th style="width:18%">结果</th><th>依据</th></tr></thead>
+<tbody>
+<tr><td>高危排最前</td><td class="ok">通过</td><td>明细第 1–4 条为 high，第 5 条为 medium，<code>ORDER</code> 字典生效</td></tr>
+<tr><td>每条带可读证据</td><td class="ok">通过</td><td>每条含完整 URL、状态码、正文字节数、命中标记</td></tr>
+<tr><td>汇总与明细对得上</td><td class="ok">通过</td><td>high 4 + medium 1 + low 0 + info 0 = 合计 5，明细 5 行</td></tr>
+</tbody>
+</table>
+
+<h2>六、运行输出</h2>
+<pre>[范围] 1 个目标全部在授权内
+
+== 192.168.88.100 ==
+   22/tcp  open    ssh    OpenSSH 8.9p1 Ubuntu 3ubuntu0.18
+   3306/tcp open   mysql  MariaDB 10.6.23
+   8080/tcp open   http   nginx 1.18.0 Ubuntu
+   web: 200  nginx/1.18.0 (Ubuntu)  标题=未知  语言=未知
+== 192.168.88.100 原始 5 条，保留 5 条
+
+[落盘] reports/scan_20261119_084549.json  2532 字节
+[报告] reports/report_20261119_084549.html  3208 字节
+EXIT=0</pre>
+
+<h2>七、提交</h2>
+<table>
+<tbody>
+<tr><td style="width:22%">commit</td><td><code>6024d29 W6: detectors 多路径与多命中修复 + 命中验证报告</code></td></tr>
+<tr><td>存档</td><td><code>docs/W6D6_report_20261119.html</code></td></tr>
+<tr><td>工作区</td><td>干净</td></tr>
+</tbody>
+</table>
+
+<h2>八、遗留</h2>
+<table>
+<tbody>
+<tr><td style="width:22%">三台靶机</td><td class="no">未达成</td><td>文档要求三台，邻居表仅网关 192.168.88.1 / .2，slave1、slave2 均未开机，实际只有 192.168.88.100 一台</td></tr>
+<tr><td>标题/语言未知</td><td class="ok">非缺陷</td><td>8080 正文仅 <code>&lt;h1&gt;site ok&lt;/h1&gt;</code>，无 <code>&lt;title&gt;</code>、无 <code>X-Powered-By</code>、无 <code>Set-Cookie</code>，判未知正确</td></tr>
+<tr><td>靶文件清理</td><td>待定</td><td>验证完毕后可执行 <code>sudo rm -rf /var/www/site/.git /var/www/site/.env /var/www/site/www.zip /var/www/site/ueditor</code></td></tr>
+</tbody>
+</table>
+
+</div>
+</body>
+</html>
