@@ -17,6 +17,7 @@ td{padding:8px 10px;border-bottom:1px solid #E5E3DC;vertical-align:top;}
 .info{color:#5F5E5A;}
 code{background:#FBFAF8;border:1px solid #E5E3DC;border-radius:4px;padding:1px 5px;font-size:12px;word-break:break-all;}
 .scope{background:#FAEEDA;border:1px solid #F0E0C0;border-radius:8px;padding:12px 16px;font-size:13px;}
+.open{color:#0F6E56;font-weight:600;}
 </style>
 </head>
 <body>
@@ -24,8 +25,26 @@ code{background:#FBFAF8;border:1px solid #E5E3DC;border-radius:4px;padding:1px 5
 <p class="meta">生成时间 {{ generated_at }}</p>
 
 <div class="scope">
-本报告仅覆盖以下 {{ targets|length }} 个目标，依据项目授权配置文件 targets.yaml 中的 allowed_networks 声明执行：{{ targets|join("、") }}。本报告不包含任何写入、上传或数据导出操作的证明。
+本报告仅覆盖以下 {{ targets|length }} 个目标，依据项目授权配置文件 {{ scope_file }} 中的 allowed_networks 声明执行：{{ targets|join("、") }}。本报告不包含任何写入、上传或数据导出操作的证明。
 </div>
+
+<h2>采集结果</h2>
+{% if rows %}
+<table>
+<tr><th>目标</th><th>端口</th><th>状态</th><th>服务</th><th>版本</th></tr>
+{% for item in rows %}
+<tr>
+<td>{{ item.ip }}</td>
+<td>{{ item.port }}</td>
+<td class="open">{{ item.state }}</td>
+<td>{{ item.service }}</td>
+<td>{{ item.version }}</td>
+</tr>
+{% endfor %}
+</table>
+{% else %}
+<p>本次运行未采集到开放端口。</p>
+{% endif %}
 
 <h2>汇总</h2>
 <table>

@@ -85,7 +85,7 @@ def run() -> int:
     print("")
     print("[落盘] " + out + "  " + str(os.path.getsize(out)) + " 字节")
 
-    report = render_report(records, outdir)
+    report = render_report(records, outdir, scope_file=path)
     print("[报告] " + report + "  " + str(os.path.getsize(report)) + " 字节")
     return 0
 
