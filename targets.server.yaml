@@ -1,0 +1,4 @@
+allowed_networks:
+  - 127.0.0.0/8
+targets:
+  - 127.0.0.1
