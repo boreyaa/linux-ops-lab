@@ -4,3 +4,6 @@ __pycache__/
 *.py.save
 *.py.save.*
 .bak_20261119/
+*.pem
+*.key
+reports/
