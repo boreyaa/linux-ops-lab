@@ -1,7 +1,7 @@
 import requests
 
 from collectors.fingerprint import pick_url
-from detectors.base import BaseDetector
+from detectors.base import BaseDetector, LEVELS
 
 PATHS = (
     ("/.git/config", "git 配置文件", "medium", "[core]"),
@@ -12,6 +12,8 @@ PATHS = (
     ("/phpinfo.php", "phpinfo 调试页", "low", "PHP Version"),
 )
 
+RANK = {name: index for index, name in enumerate(LEVELS)}
+
 
 class SensitiveFileDetector(BaseDetector):
     name = "sensitive_file"
@@ -20,6 +22,7 @@ class SensitiveFileDetector(BaseDetector):
         base = pick_url(target.get("ip"), target.get("ports") or [])
         if not base:
             return None
+        hits = []
         for path, title, level, marker in PATHS:
             url = base.rstrip("/") + path
             try:
@@ -31,9 +34,12 @@ class SensitiveFileDetector(BaseDetector):
             body = resp.text[:4096]
             if marker and marker not in body:
                 continue
-            return self.make(
+            hits.append(self.make(
                 level,
                 title + " 可未授权读取",
                 url + " 状态 200，正文前 4096 字节含特征 " + str(marker),
-            )
-        return None
+            ))
+        if not hits:
+            return None
+        hits.sort(key=lambda item: RANK.get(item["level"], 9))
+        return hits

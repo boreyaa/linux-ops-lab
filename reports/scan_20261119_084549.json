@@ -1,0 +1,87 @@
+[
+  {
+    "ip": "192.168.88.100",
+    "ports": [
+      {
+        "port": 22,
+        "proto": "tcp",
+        "state": "open",
+        "service": "ssh",
+        "version": "OpenSSH 8.9p1 Ubuntu 3ubuntu0.18 Ubuntu Linux; protocol 2.0"
+      },
+      {
+        "port": 80,
+        "proto": "tcp",
+        "state": "closed",
+        "service": "http",
+        "version": ""
+      },
+      {
+        "port": 443,
+        "proto": "tcp",
+        "state": "closed",
+        "service": "https",
+        "version": ""
+      },
+      {
+        "port": 3306,
+        "proto": "tcp",
+        "state": "open",
+        "service": "mysql",
+        "version": "MySQL 5.5.5-10.6.23-MariaDB-0ubuntu0.22.04.1"
+      },
+      {
+        "port": 6379,
+        "proto": "tcp",
+        "state": "closed",
+        "service": "redis",
+        "version": ""
+      },
+      {
+        "port": 8080,
+        "proto": "tcp",
+        "state": "open",
+        "service": "http",
+        "version": "nginx 1.18.0 Ubuntu"
+      }
+    ],
+    "web": {
+      "status_code": 200,
+      "server": "nginx/1.18.0 (Ubuntu)",
+      "title": "未知",
+      "language": "未知"
+    },
+    "findings": [
+      {
+        "detector": "ueditor_unauth",
+        "level": "high",
+        "title": "UEditor 配置接口未授权访问",
+        "evidence": "http://192.168.88.100:8080/ueditor/controller.php?action=config 状态 200，正文 193 字节，命中标记 imageUrlPrefix,imageMaxSize,imagePathFormat"
+      },
+      {
+        "detector": "ueditor_unauth",
+        "level": "high",
+        "title": "UEditor 配置接口未授权访问",
+        "evidence": "http://192.168.88.100:8080/ueditor/php/controller.php?action=config 状态 200，正文 193 字节，命中标记 imageUrlPrefix,imageMaxSize,imagePathFormat"
+      },
+      {
+        "detector": "sensitive_file",
+        "level": "high",
+        "title": "环境变量文件 可未授权读取",
+        "evidence": "http://192.168.88.100:8080/.env 状态 200，正文前 4096 字节含特征 ="
+      },
+      {
+        "detector": "sensitive_file",
+        "level": "high",
+        "title": "站点源码压缩包 可未授权读取",
+        "evidence": "http://192.168.88.100:8080/www.zip 状态 200，正文前 4096 字节含特征 None"
+      },
+      {
+        "detector": "sensitive_file",
+        "level": "medium",
+        "title": "git 配置文件 可未授权读取",
+        "evidence": "http://192.168.88.100:8080/.git/config 状态 200，正文前 4096 字节含特征 [core]"
+      }
+    ]
+  }
+]

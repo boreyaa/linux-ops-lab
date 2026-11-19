@@ -73,7 +73,9 @@ def run() -> int:
             except Exception as exc:
                 print("  [检测异常] " + detector.name + " " + type(exc).__name__)
                 continue
-            if hit:
+            if isinstance(hit, list):
+                raw.extend(hit)
+            elif hit:
                 raw.append(hit)
         kept = normalize(raw)
         record["findings"] = kept
